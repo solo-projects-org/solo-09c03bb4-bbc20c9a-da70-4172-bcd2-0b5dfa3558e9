@@ -19,13 +19,16 @@
   .swatch { display: inline-block; width: 12px; height: 12px; border: 1px solid #999; vertical-align: -1px; }
   form.inline { display: inline-block; margin: 4px 8px 4px 0; }
   .hint { color: #666; font-size: 13px; }
+  .ok-num { color: #282; } .bad-num { color: #c33; } .miss-num { color: #a60; }
   input[type=number] { width: 80px; }
   textarea { width: 420px; font-family: monospace; }
+  code { background: #f5f5f5; padding: 0 3px; }
 </style>
 </head>
 <body>
 <h1>芦苇斑块跨图幅调查</h1>
-<p>当前发布版本 <b>v{{ version }}</b> · 图幅 {{ sheets|length }} 片 · 斑块 {{ patches|length }} 个 · 芦苇格共 {{ total_reeds }} 格
+<p>当前发布版本 <b>v{{ version }}</b> · 生效样方表版 <b>{% if sample_version %}sv{{ sample_version }}{% else %}未上传{% endif %}</b>
+   · 图幅 {{ sheets|length }} 片 · 斑块 {{ patches|length }} 个 · 芦苇格共 {{ total_reeds }} 格
    <span class="hint">（全图行、列号均从 0 起计；斑块号 = 该斑块最北一行中最西一格的全图行列号）</span></p>
 
 {% with msgs = get_flashed_messages(with_categories=true) %}
@@ -42,7 +45,70 @@
     <br>
     <textarea name="text" rows="3" placeholder="也可直接粘贴 16 行 × 16 列的 0/1 CSV（文件优先）"></textarea>
   </form>
-  <p class="hint">格式：16 行，每行 16 个 0/1（逗号分隔；也兼容无逗号的 16 位串）。校验失败不会改动已发布数据。</p>
+  <p class="hint">格式：16 行，每行 16 个 0/1（逗号分隔；也兼容无逗号的 16 位串）。校验失败不会改动已发布数据。
+     已上传样方表时，若换片会把<b>原本与现场一致</b>的格改成不符或缺测，整片退回并列出这些格的坐标。</p>
+</section>
+
+<section>
+  <h2>上传 / 替换样方表（现场判定）</h2>
+  {% if sample_version %}
+  <p>生效样方表版 <b>sv{{ sample_version }}</b>，共 {{ sample_count }} 格。</p>
+  {% else %}
+  <p class="hint">尚未上传样方表。</p>
+  {% endif %}
+  <form method="post" action="{{ url_for('samples_upload') }}" enctype="multipart/form-data">
+    CSV 文件 <input type="file" name="file" accept=".csv,text/csv,text/plain">
+    <button type="submit">上传 / 替换样方表（整表替换）</button>
+    <br>
+    <textarea name="text" rows="3" placeholder="也可直接粘贴：每行 全图行,全图列,0/1（文件优先）"></textarea>
+  </form>
+  <p class="hint">格式：每行 <code>全图行,全图列,值</code>（值只许 0/1；首行可为表头）。
+     同一格重复登记、坐标越界、值非法均<b>整表拒收</b>；换表失败继续使用原表。重算斑块期间也可换表。</p>
+</section>
+
+<section>
+  <h2>样方对照 <span class="hint">地图版 v{{ version }} · 样方表版 {% if sample_version %}sv{{ sample_version }}{% else %}无{% endif %}</span></h2>
+  {% if comparison %}
+  <p><span class="ok-num">一致 <b>{{ cmp_counts.consistent }}</b> 格</span> ·
+     <span class="bad-num">不符 <b>{{ cmp_counts.mismatched }}</b> 格</span> ·
+     <span class="miss-num">缺测 <b>{{ cmp_counts.missing }}</b> 格</span></p>
+  <table class="data">
+    <tr><th>结论</th><th>格（全图行,列）</th></tr>
+    <tr><td>一致</td><td>{{ comparison.consistent|join("、") if comparison.consistent else "—" }}</td></tr>
+    <tr><td>不符</td><td>{{ comparison.mismatched|join("、") if comparison.mismatched else "—" }}</td></tr>
+    <tr><td>缺测（所在图幅未交付）</td><td>{{ comparison.missing|join("、") if comparison.missing else "—" }}</td></tr>
+  </table>
+  {% if cmp_truncated %}<p class="hint">每类仅列前 200 格，完整清单见 <a href="{{ url_for('api_comparison') }}">/api/comparison</a>。</p>{% endif %}
+  {% else %}
+  <p class="hint">上传样方表后，在此对照现行图幅列出一致、不符和缺测的格。</p>
+  {% endif %}
+</section>
+
+<section>
+  <h2>在线试：样方核查与分次修正</h2>
+  <form class="inline" method="post" action="{{ url_for('demo', name='check_load') }}">
+    <button type="submit">④ 载入核查示例（两片图幅 + 样方表）</button>
+  </form>
+  <form class="inline" method="post" action="{{ url_for('demo', name='check_fix1') }}">
+    <button type="submit">⑤ 分次修正第一批：补 (4,4)</button>
+  </form>
+  <form class="inline" method="post" action="{{ url_for('demo', name='check_fix2') }}">
+    <button type="submit">⑥ 分次修正第二批：补 (4,5)</button>
+  </form>
+  <form class="inline" method="post" action="{{ url_for('demo', name='check_cover') }}">
+    <button type="submit">⑦ 补交图幅 (1,0)：缺测格 (20,3) 转一致</button>
+  </form>
+  <form class="inline" method="post" action="{{ url_for('demo', name='check_bad') }}">
+    <button type="submit">⑧ 试投会把已对齐格 (8,10) 改错的换片 → 退回</button>
+  </form>
+  <form class="inline" method="post" action="{{ url_for('demo', name='check_reset') }}">
+    <button type="submit">⑨ 演示重置（样方表换代并清空图幅）</button>
+  </form>
+  <p class="hint">按 ④→⑧ 顺序点击：④ 载入后上方对照区可见 一致 3 · 不符 2 · 缺测 1；
+     ⑤⑥ 把不符格分两次改对（逐格判定，修好一格不抵消其他格的校验）；⑦ 补交缺失图幅使缺测转一致；
+     ⑧ 的换片会把已与现场一致的 (8,10) 改错 → 发布被退回并列出坐标，原掩膜与斑块成果不变。
+     守护对每次交片生效：原本一致的格变成不符或缺测即整片退回；原本不符/缺测的格可分次修正。
+     ⑨ 演示样方表换代：新表生效后按新表守护，旧表约束解除，可重新跑 ④→⑧。</p>
 </section>
 
 <section>
@@ -57,7 +123,8 @@
     <button type="submit">清空全部图幅</button>
   </form>
   <p class="hint">① 在 (0,0) 与 (0,1) 两片各放一段第 8 行的条带，跨片缝共边相连 → 全图只有 1 个斑块（12 格）；
-     ② 把 (0,1) 片替换为第 9 行的条带，连接断开 → 拆成 2 个斑块（各 6 格），编号与总格数随之更新。</p>
+     ② 把 (0,1) 片替换为第 9 行的条带，连接断开 → 拆成 2 个斑块（各 6 格），编号与总格数随之更新。
+     注意：已上传样方表时，这三个操作同样受样方守护约束（例如清空会把一致格变成缺测而被退回）。</p>
 </section>
 
 <section>

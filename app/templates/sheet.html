@@ -50,5 +50,20 @@
 {% else %}
 <p class="hint">本片没有芦苇格。</p>
 {% endif %}
+
+<h2>本片样方对照 <span class="hint">样方表版 {% if sample_version %}sv{{ sample_version }}{% else %}无{% endif %}</span></h2>
+{% if samples_here %}
+<table class="data">
+  <tr><th>全图行</th><th>全图列</th><th>现场判定</th><th>图上值</th><th>结论</th></tr>
+  {% for s in samples_here %}
+  <tr>
+    <td>{{ s.grow }}</td><td>{{ s.gcol }}</td><td>{{ s.field }}</td><td>{{ s.map }}</td>
+    <td>{{ s.status }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p class="hint">本片范围内没有样方登记。</p>
+{% endif %}
 </body>
 </html>
