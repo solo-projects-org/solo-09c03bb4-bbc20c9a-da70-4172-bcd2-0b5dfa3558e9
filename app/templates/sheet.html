@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>图幅 ({{ sr }}, {{ sc }}) · 芦苇斑块</title>
+<style>
+  body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; margin: 24px; color: #222; }
+  h1 { font-size: 20px; }
+  table.grid { border-collapse: collapse; margin: 10px 0; }
+  table.grid td { width: 46px; height: 34px; border: 1px solid #bbb; text-align: center;
+                  font-size: 11px; color: #333; }
+  table.grid td.water { background: #eef4fb; }
+  table.data { border-collapse: collapse; }
+  table.data th, table.data td { border: 1px solid #ccc; padding: 4px 12px; font-size: 14px; }
+  table.data th { background: #f3f3f3; }
+  .swatch { display: inline-block; width: 12px; height: 12px; border: 1px solid #999; vertical-align: -1px; }
+  .hint { color: #666; font-size: 13px; }
+</style>
+</head>
+<body>
+<p><a href="{{ url_for('index') }}">← 返回总览</a></p>
+<h1>图幅 ({{ sr }}, {{ sc }}) <span class="hint">发布版本 v{{ version }}</span></h1>
+<p class="hint">格内数字为该芦苇格所属斑块号（全图行,列，0 起计）；悬停查看全图坐标与斑块总格数。</p>
+
+<table class="grid">
+  {% for row in grid %}
+  <tr>
+    {% for c in row %}
+      {% if c.bit == '1' %}
+    <td style="background:{{ c.color }}" title="全图({{ c.grow }},{{ c.gcol }}) 斑块({{ c.pid }}) 全图共 {{ c.size }} 格">{{ c.pid }}</td>
+      {% else %}
+    <td class="water" title="全图({{ c.grow }},{{ c.gcol }})"></td>
+      {% endif %}
+    {% endfor %}
+  </tr>
+  {% endfor %}
+</table>
+
+<h2>本片斑块汇总</h2>
+{% if summary %}
+<table class="data">
+  <tr><th>斑块号（全图行,列）</th><th>本片内格数</th><th>全图总格数</th><th>颜色</th></tr>
+  {% for p in summary %}
+  <tr>
+    <td>({{ p.id }})</td><td>{{ p.cells_here }}</td><td>{{ p.total }}</td>
+    <td><span class="swatch" style="background:{{ p.color }}"></span></td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p class="hint">本片没有芦苇格。</p>
+{% endif %}
+</body>
+</html>

@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>芦苇斑块跨图幅调查</title>
+<style>
+  body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; margin: 24px; color: #222; }
+  h1 { font-size: 22px; } h2 { font-size: 17px; margin-bottom: 8px; }
+  section { border: 1px solid #ddd; border-radius: 8px; padding: 14px 18px; margin: 14px 0; }
+  .flash-ok { background: #e7f6e7; border: 1px solid #8c8; padding: 8px 12px; border-radius: 6px; }
+  .flash-error { background: #fde8e8; border: 1px solid #c88; padding: 8px 12px; border-radius: 6px; }
+  table.data { border-collapse: collapse; }
+  table.data th, table.data td { border: 1px solid #ccc; padding: 4px 10px; font-size: 14px; }
+  table.data th { background: #f3f3f3; }
+  table.map { border-collapse: collapse; }
+  table.map td { width: 16px; height: 16px; padding: 0; }
+  table.map td.water { background: #eef4fb; }
+  table.map td.gap { background: #ddd; }
+  .swatch { display: inline-block; width: 12px; height: 12px; border: 1px solid #999; vertical-align: -1px; }
+  form.inline { display: inline-block; margin: 4px 8px 4px 0; }
+  .hint { color: #666; font-size: 13px; }
+  input[type=number] { width: 80px; }
+  textarea { width: 420px; font-family: monospace; }
+</style>
+</head>
+<body>
+<h1>芦苇斑块跨图幅调查</h1>
+<p>当前发布版本 <b>v{{ version }}</b> · 图幅 {{ sheets|length }} 片 · 斑块 {{ patches|length }} 个 · 芦苇格共 {{ total_reeds }} 格
+   <span class="hint">（全图行、列号均从 0 起计；斑块号 = 该斑块最北一行中最西一格的全图行列号）</span></p>
+
+{% with msgs = get_flashed_messages(with_categories=true) %}
+  {% for cat, m in msgs %}<p class="flash-{{ cat }}">{{ m }}</p>{% endfor %}
+{% endwith %}
+
+<section>
+  <h2>上传 / 替换图幅掩膜</h2>
+  <form method="post" action="{{ url_for('upload') }}" enctype="multipart/form-data">
+    图幅行 <input name="sheet_row" type="number" min="0" max="999" required>
+    图幅列 <input name="sheet_col" type="number" min="0" max="999" required>
+    CSV 文件 <input type="file" name="file" accept=".csv,text/csv,text/plain">
+    <button type="submit">提交（同位置自动替换）</button>
+    <br>
+    <textarea name="text" rows="3" placeholder="也可直接粘贴 16 行 × 16 列的 0/1 CSV（文件优先）"></textarea>
+  </form>
+  <p class="hint">格式：16 行，每行 16 个 0/1（逗号分隔；也兼容无逗号的 16 位串）。校验失败不会改动已发布数据。</p>
+</section>
+
+<section>
+  <h2>在线试：跨片合并 / 拆开</h2>
+  <form class="inline" method="post" action="{{ url_for('demo', name='merge') }}">
+    <button type="submit">① 载入合并示例：两片条带跨缝相接</button>
+  </form>
+  <form class="inline" method="post" action="{{ url_for('demo', name='split') }}">
+    <button type="submit">② 替换右片使条带错开 → 拆开</button>
+  </form>
+  <form class="inline" method="post" action="{{ url_for('demo', name='clear') }}">
+    <button type="submit">清空全部图幅</button>
+  </form>
+  <p class="hint">① 在 (0,0) 与 (0,1) 两片各放一段第 8 行的条带，跨片缝共边相连 → 全图只有 1 个斑块（12 格）；
+     ② 把 (0,1) 片替换为第 9 行的条带，连接断开 → 拆成 2 个斑块（各 6 格），编号与总格数随之更新。</p>
+</section>
+
+<section>
+  <h2>图幅列表</h2>
+  {% if sheets %}
+  <table class="data">
+    <tr><th>图幅行</th><th>图幅列</th><th>芦苇格数</th><th>片内斑块数</th><th></th></tr>
+    {% for s in sheets %}
+    <tr>
+      <td>{{ s.row }}</td><td>{{ s.col }}</td><td>{{ s.reeds }}</td><td>{{ s.patch_count }}</td>
+      <td><a href="{{ url_for('sheet_view', sr=s.row, sc=s.col) }}">查看该片</a></td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}<p class="hint">尚无图幅，请先上传或载入示例。</p>{% endif %}
+</section>
+
+<section>
+  <h2>斑块汇总（全图）</h2>
+  {% if patches %}
+  <table class="data">
+    <tr><th>斑块号（全图行,列）</th><th>全图总格数</th><th>颜色</th></tr>
+    {% for p in patches %}
+    <tr><td>({{ p.id }})</td><td>{{ p.size }}</td><td><span class="swatch" style="background:{{ p.color }}"></span></td></tr>
+    {% endfor %}
+  </table>
+  {% else %}<p class="hint">暂无芦苇格。</p>{% endif %}
+</section>
+
+<section>
+  <h2>全图预览</h2>
+  {% if map_too_big %}
+    <p class="hint">图幅分布范围过大，预览从略；请逐片查看。</p>
+  {% elif map_rows %}
+    <table class="map">
+      {% for row in map_rows %}
+      <tr>{% for c in row %}<td class="{{ c.cls }}" style="{{ c.style }}" title="{{ c.title }}"></td>{% endfor %}</tr>
+      {% endfor %}
+    </table>
+    <p class="hint">粗线为片缝；悬停格子可看全图坐标、斑块号与总格数；灰色为无图幅区域。</p>
+  {% else %}
+    <p class="hint">暂无数据。</p>
+  {% endif %}
+</section>
+</body>
+</html>
